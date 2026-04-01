@@ -171,6 +171,7 @@
             z-index: 1000;
             white-space: nowrap;
             pointer-events: none;
+            transition: opacity 0.3s;
         }
 
         /* ── Tela de carregamento ────────────────────────────── */
@@ -224,6 +225,134 @@
     </style>
 
     <script>
+        /* ══════════════════════════════════════════════════════
+           COMPONENTE: gesto-modelo
+           Rotação com 1 dedo (ou arrastar mouse) e zoom por
+           pinça (ou scroll de mouse) sobre o modelo AR.
+        ════════════════════════════════════════════════════════ */
+        AFRAME.registerComponent('gesto-modelo', {
+            init: function () {
+                this.escalaAtual = 0.05;
+                this.ESCALA_MIN = 0.01;
+                this.ESCALA_MAX = 0.40;
+                this.rotacaoY = 0;
+                this.marcadorAtivo = false;
+                this._arrastou = false;
+                this._mouseArrastando = false;
+
+                this._touchStart = this._touchStart.bind(this);
+                this._touchMove = this._touchMove.bind(this);
+                this._touchEnd = this._touchEnd.bind(this);
+                this._mouseDown = this._mouseDown.bind(this);
+                this._mouseMove = this._mouseMove.bind(this);
+                this._mouseUp = this._mouseUp.bind(this);
+                this._wheel = this._wheel.bind(this);
+
+                document.addEventListener('touchstart', this._touchStart, { passive: true });
+                document.addEventListener('touchmove', this._touchMove, { passive: true });
+                document.addEventListener('touchend', this._touchEnd, { passive: true });
+                document.addEventListener('mousedown', this._mouseDown);
+                document.addEventListener('mousemove', this._mouseMove);
+                document.addEventListener('mouseup', this._mouseUp);
+                document.addEventListener('wheel', this._wheel, { passive: true });
+
+                const marcador = this.el.parentEl;
+                marcador.addEventListener('markerFound', () => {
+                    this.marcadorAtivo = true;
+                    const s = this.el.getAttribute('scale');
+                    if (s) this.escalaAtual = s.x;
+                });
+                marcador.addEventListener('markerLost', () => {
+                    this.marcadorAtivo = false;
+                });
+            },
+
+            remove: function () {
+                document.removeEventListener('touchstart', this._touchStart);
+                document.removeEventListener('touchmove', this._touchMove);
+                document.removeEventListener('touchend', this._touchEnd);
+                document.removeEventListener('mousedown', this._mouseDown);
+                document.removeEventListener('mousemove', this._mouseMove);
+                document.removeEventListener('mouseup', this._mouseUp);
+                document.removeEventListener('wheel', this._wheel);
+            },
+
+            _dist: function (touches) {
+                const dx = touches[0].clientX - touches[1].clientX;
+                const dy = touches[0].clientY - touches[1].clientY;
+                return Math.sqrt(dx * dx + dy * dy);
+            },
+
+            _touchStart: function (e) {
+                if (!this.marcadorAtivo) return;
+                this._arrastou = false;
+                if (e.touches.length === 1) {
+                    this._lastX = e.touches[0].clientX;
+                } else if (e.touches.length === 2) {
+                    this._lastPinch = this._dist(e.touches);
+                }
+            },
+
+            _touchMove: function (e) {
+                if (!this.marcadorAtivo) return;
+                if (e.touches.length === 1) {
+                    const dx = e.touches[0].clientX - this._lastX;
+                    if (Math.abs(dx) > 3) this._arrastou = true;
+                    this._lastX = e.touches[0].clientX;
+                    this.rotacaoY += dx * 0.5;
+                    this.el.setAttribute('rotation', { x: 0, y: this.rotacaoY, z: 0 });
+                } else if (e.touches.length === 2) {
+                    this._arrastou = true;
+                    const dist = this._dist(e.touches);
+                    const fator = dist / this._lastPinch;
+                    this._lastPinch = dist;
+                    this.escalaAtual = Math.min(
+                        this.ESCALA_MAX,
+                        Math.max(this.ESCALA_MIN, this.escalaAtual * fator)
+                    );
+                    const s = this.escalaAtual;
+                    this.el.setAttribute('scale', { x: s, y: s, z: s });
+                }
+            },
+
+            _touchEnd: function (e) {
+                if (e.touches.length === 1) {
+                    this._lastX = e.touches[0].clientX;
+                }
+            },
+
+            _mouseDown: function (e) {
+                if (!this.marcadorAtivo) return;
+                this._mouseArrastando = true;
+                this._arrastou = false;
+                this._lastX = e.clientX;
+            },
+
+            _mouseMove: function (e) {
+                if (!this.marcadorAtivo || !this._mouseArrastando) return;
+                const dx = e.clientX - this._lastX;
+                if (Math.abs(dx) > 3) this._arrastou = true;
+                this._lastX = e.clientX;
+                this.rotacaoY += dx * 0.4;
+                this.el.setAttribute('rotation', { x: 0, y: this.rotacaoY, z: 0 });
+            },
+
+            _mouseUp: function () {
+                this._mouseArrastando = false;
+            },
+
+            _wheel: function (e) {
+                if (!this.marcadorAtivo) return;
+                const fator = e.deltaY > 0 ? 0.95 : 1.05;
+                this.escalaAtual = Math.min(
+                    this.ESCALA_MAX,
+                    Math.max(this.ESCALA_MIN, this.escalaAtual * fator)
+                );
+                const s = this.escalaAtual;
+                this.el.setAttribute('scale', { x: s, y: s, z: s });
+            }
+        });
+
         /* ══════════════════════════════════════════════════════
            COMPONENTE: orbita-planetaria
            Anima translação orbital e rotação axial de cada
@@ -424,22 +553,25 @@
                 this.pausado = false;
                 this.PASSOS_VEL = [0.25, 0.5, 1, 2, 5, 10];
                 this.idxVel = 2; // começa em 1×
+                this._intervalDica = null;
 
                 const marcador = this.el.parentEl;
 
                 // ── Marcador encontrado / perdido ──────────────────────
                 marcador.addEventListener('markerFound', () => {
                     this.controles.style.display = 'flex';
-                    this.dicaToque.style.display = 'block';
+                    this._iniciarCiclo();
                 });
 
                 marcador.addEventListener('markerLost', () => {
                     this.painel.style.display = 'none';
-                    this.dicaToque.style.display = 'none';
+                    this._pararCiclo();
                 });
 
                 // ── Interação 1: toque em astro → painel informativo ───
                 this.el.addEventListener('click', ev => {
+                    const gesto = this.el.components['gesto-modelo'];
+                    if (gesto && gesto._arrastou) return;
                     if (!ev.detail.intersection) return;
                     const nome = ev.detail.intersection.object.name.toUpperCase();
                     this._exibirInfo(nome);
@@ -513,6 +645,32 @@
                 this.labelVel.textContent = vel + '×';
             },
 
+            _iniciarCiclo: function () {
+                const dicas = [
+                    '👆 Toque em um astro',
+                    '↔ Arraste para girar',
+                    '🤏 Pinça para zoom'
+                ];
+                let idx = 0;
+                this.dicaToque.textContent = dicas[0];
+                this.dicaToque.style.opacity = '1';
+                this.dicaToque.style.display = 'block';
+                clearInterval(this._intervalDica);
+                this._intervalDica = setInterval(() => {
+                    this.dicaToque.style.opacity = '0';
+                    setTimeout(() => {
+                        idx = (idx + 1) % dicas.length;
+                        this.dicaToque.textContent = dicas[idx];
+                        this.dicaToque.style.opacity = '1';
+                    }, 300);
+                }, 3000);
+            },
+
+            _pararCiclo: function () {
+                clearInterval(this._intervalDica);
+                this.dicaToque.style.display = 'none';
+            },
+
             _exibirInfo: function (nome) {
                 // Chaves baseadas nos nomes de mesh do novo modelo (solar_system.glb)
                 const catalogo = {
@@ -555,6 +713,7 @@
         <h1>Sistema Solar em RA</h1>
         <p>Aponte a câmera para o marcador <strong>Hiro</strong> e explore o Sistema Solar em Realidade Aumentada.</p>
         <p>Toque em qualquer astro para aprender sobre ele.</p>
+        <p>Arraste para girar o modelo. Junte dois dedos para zoom.</p>
         <p>Ative as órbitas para ver os planetas em movimento!</p>
         <button id="btn-comecar">Iniciar Experiência</button>
     </div>
@@ -563,7 +722,7 @@
     <div id="tela-carregando">
         <div class="spinner"></div>
         <p>Carregando o Sistema Solar...</p>
-        <p style="font-size:0.78rem; color:#7a8fb0;">O modelo é grande (~61 MB). Aguarde alguns instantes.</p>
+        <p style="font-size:0.78rem; color:#7a8fb0;">Aguarde enquanto o modelo é carregado...</p>
         <p id="msg-erro-glb">Erro ao carregar o modelo 3D.<br>Verifique sua conexão e recarregue a página.</p>
     </div>
 
@@ -607,8 +766,8 @@
                 scale: ajuste conforme o tamanho do modelo no marcador.
                 
             -->
-            <a-entity id="modelo-sistema" gltf-model="#modelo-glb" position="0 0 0" scale="0.2 0.2 0.2"
-                class="clicavel" animation-mixer="clip: *; loop: repeat; timeScale: 0.5" orbita-planetaria
+            <a-entity id="modelo-sistema" gltf-model="#modelo-glb" position="0 0 0" scale="0.2 0.2 0.2" class="clicavel"
+                animation-mixer="clip: *; loop: repeat; timeScale: 0.5" orbita-planetaria gesto-modelo
                 interacao-sistema-solar>
             </a-entity>
         </a-marker>

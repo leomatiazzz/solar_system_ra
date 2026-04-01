@@ -750,7 +750,7 @@
 
     <!-- ── Cena AR ────────────────────────────────────────────── -->
     <a-scene embedded arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;"
-        vr-mode-ui="enabled: false" renderer="logarithmicDepthBuffer: false;">
+        vr-mode-ui="enabled: false" renderer="antialias: true; physicallyCorrectLights: true; colorManagement: true;">
 
         <a-assets>
             <a-asset-item id="modelo-glb" src="solar_system.glb"></a-asset-item>
@@ -767,7 +767,7 @@
                 
             -->
             <a-entity id="modelo-sistema" gltf-model="#modelo-glb" position="0 0 0" scale="0.2 0.2 0.2" class="clicavel"
-                animation-mixer="clip: *; loop: repeat; timeScale: 0.5" orbita-planetaria gesto-modelo
+                animation-mixer="clip: *; loop: repeat; timeScale: 1" orbita-planetaria gesto-modelo
                 interacao-sistema-solar>
             </a-entity>
         </a-marker>

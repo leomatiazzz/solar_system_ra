@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sistema Solar – WebAR Educativo</title>
+
+    <script src="https://aframe.io/releases/1.3.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v6.1.1/dist/aframe-extras.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+
+        /* ── Tela de boas-vindas ─────────────────────────────── */
+        #tela-instrucoes {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 20, 0.95);
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            text-align: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        #tela-instrucoes .icone {
+            font-size: 3.5rem;
+            margin-bottom: 10px;
+        }
+
+        #tela-instrucoes h1 {
+            font-size: 1.5rem;
+            color: #9ecfff;
+            margin: 0 0 8px;
+        }
+
+        #tela-instrucoes p {
+            font-size: 0.9rem;
+            color: #bbcde6;
+            max-width: 340px;
+            line-height: 1.6;
+            margin: 4px 0;
+        }
+
+        #btn-comecar {
+            margin-top: 22px;
+            padding: 11px 30px;
+            background: #2b7fd4;
+            color: #fff;
+            border: none;
+            border-radius: 30px;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+
+        /* ── Painel de informações (HUD) ─────────────────────── */
+        #painel-hud {
+            display: none;
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 5, 30, 0.90);
+            border: 1px solid rgba(80, 140, 255, 0.45);
+            border-radius: 14px;
+            padding: 14px 20px 16px;
+            width: min(85%, 380px);
+            box-sizing: border-box;
+            z-index: 1000;
+            color: #fff;
+        }
+
+        #hud-titulo {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #9ecfff;
+            margin-bottom: 6px;
+        }
+
+        #hud-desc {
+            font-size: 0.85rem;
+            line-height: 1.55;
+            color: #ccd5e8;
+        }
+
+        #btn-fechar-hud {
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            background: none;
+            border: none;
+            color: #899;
+            font-size: 1.1rem;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        /* ── Painel de controles AR (top-right) ──────────────── */
+        #controles {
+            display: none;
+            position: fixed;
+            top: 14px;
+            right: 14px;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 8px;
+            z-index: 1000;
+        }
+
+        .btn-ctrl {
+            background: rgba(0, 5, 30, 0.82);
+            border: 1px solid rgba(80, 140, 255, 0.45);
+            color: #fff;
+            border-radius: 25px;
+            padding: 8px 18px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        /* ── Controle de velocidade orbital ──────────────────── */
+        #vel-grupo {
+            display: none;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 5, 30, 0.82);
+            border: 1px solid rgba(80, 140, 255, 0.45);
+            border-radius: 25px;
+            padding: 6px 14px;
+        }
+
+        #vel-grupo button {
+            background: none;
+            border: none;
+            color: #9ecfff;
+            font-size: 1.1rem;
+            cursor: pointer;
+            padding: 0 4px;
+            line-height: 1;
+        }
+
+        #label-vel {
+            color: #fff;
+            font-size: 0.85rem;
+            min-width: 30px;
+            text-align: center;
+        }
+
+        /* ── Dica flutuante ──────────────────────────────────── */
+        #dica-toque {
+            display: none;
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 5, 30, 0.75);
+            color: #bbcde6;
+            border-radius: 20px;
+            padding: 6px 16px;
+            font-size: 0.78rem;
+            z-index: 1000;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        /* ── Tela de carregamento ────────────────────────────── */
+        #tela-carregando {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 20, 0.95);
+            color: #fff;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 9998;
+            text-align: center;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+
+        .spinner {
+            width: 52px;
+            height: 52px;
+            border: 4px solid rgba(158, 207, 255, 0.2);
+            border-top-color: #9ecfff;
+            border-radius: 50%;
+            animation: girar 0.9s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes girar {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        #tela-carregando p {
+            font-size: 0.9rem;
+            color: #bbcde6;
+            margin: 4px 0;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+
+        #msg-erro-glb {
+            display: none;
+            color: #ff8a8a;
+            font-size: 0.85rem;
+            margin-top: 14px;
+            max-width: 300px;
+            line-height: 1.5;
+        }
+    </style>
+
+    <script>
+        /* ══════════════════════════════════════════════════════
+           COMPONENTE: orbita-planetaria
+           Anima translação orbital e rotação axial de cada
+           planeta com velocidades angulares proporcionais
+           aos períodos reais do Sistema Solar.
+
+           Nós orbitais (BezierCircle) e seus planetas (Sphere):
+             BezierCircle      → Sphere_002   (Mercúrio)
+             BezierCircle_001  → Sphere_009   (Vênus)
+             BezierCircle_002  → Sphere_003   (Terra)
+             BezierCircle_003  → Sphere_010   (Lua – orbita Terra)
+             BezierCircle_004  → Sphere       (Marte)
+             BezierCircle_005  → Sphere_005   (Júpiter)
+             BezierCircle_006  → Sphere_006   (Saturno)
+             BezierCircle_007  → Sphere_007   (Urano)
+             BezierCircle_008  → Sphere_008   (Netuno)
+        ════════════════════════════════════════════════════════ */
+        AFRAME.registerComponent('orbita-planetaria', {
+            schema: { velocidade: { type: 'number', default: 1.0 } },
+
+            init: function () {
+                this.ativo = false;
+                this.pronto = false;
+                this.planetas = [];
+                this.dadosLua = null;
+                this._atmoNode = null;
+
+                // BezierCircle → chave do catálogo (nó orbital do novo modelo)
+                this.MAPA_NOS = {
+                    'beziercircle': 'MERCURY',
+                    'beziercircle_001': 'VENUS',
+                    'beziercircle_002': 'EARTH',
+                    'beziercircle_004': 'MARS',
+                    'beziercircle_005': 'JUPITER',
+                    'beziercircle_006': 'SATURN',
+                    'beziercircle_007': 'URANUS',
+                    'beziercircle_008': 'NEPTUNE',
+                };
+
+                // Sphere correspondente a cada planeta (para rotação axial)
+                this.MAPA_SPHERES = {
+                    'MERCURY': 'sphere_002',
+                    'VENUS': 'sphere_009',
+                    'EARTH': 'sphere_003',
+                    'MARS': 'sphere',
+                    'JUPITER': 'sphere_005',
+                    'SATURN': 'sphere_006',
+                    'URANUS': 'sphere_007',
+                    'NEPTUNE': 'sphere_008',
+                };
+
+                // Períodos orbitais em anos terrestres
+                this.PERIODOS_ORBITAIS = {
+                    MERCURY: 0.241, VENUS: 0.615, EARTH: 1.0,
+                    MARS: 1.881, JUPITER: 11.86, SATURN: 29.46,
+                    URANUS: 84.01, NEPTUNE: 164.8, PLUTO: 248.1
+                };
+
+                // Períodos de rotação axial em dias terrestres
+                // (negativo = sentido retrógrado)
+                this.PERIODOS_ROTACAO = {
+                    MERCURY: 58.6, VENUS: -243.0, EARTH: 1.0,
+                    MARS: 1.03, JUPITER: 0.41, SATURN: 0.44,
+                    URANUS: -0.72, NEPTUNE: 0.67, PLUTO: 6.39,
+                    MOON: 27.3
+                };
+
+                this.el.addEventListener('model-loaded', () => this._mapearPlanetas());
+            },
+
+            _mapearPlanetas: function () {
+                const raiz = this.el.getObject3D('mesh');
+                if (!raiz) { console.warn('[Órbita] Mesh não encontrado.'); return; }
+
+                // Velocidade angular de referência visual
+                const OMEGA_TERRA = 0.3;   // rad/s orbital
+                const OMEGA_ROT = 1.0;   // rad/s rotação axial da Terra
+
+                // Índice name→node com chave em minúsculas para lookup seguro
+                const idxNos = {};
+                raiz.traverse(node => {
+                    if (node.name) idxNos[node.name.toLowerCase()] = node;
+                });
+
+                console.log('[Órbita] Nós disponíveis:', Object.keys(idxNos).join(', '));
+
+                for (const [nomeNo, planeta] of Object.entries(this.MAPA_NOS)) {
+                    const node = idxNos[nomeNo];
+                    if (!node) {
+                        console.warn(`[Órbita] Nó não encontrado: "${nomeNo}"`);
+                        continue;
+                    }
+                    const sphereNode = idxNos[this.MAPA_SPHERES[planeta]] || null;
+                    const periodo = this.PERIODOS_ORBITAIS[planeta];
+                    const periodoRot = this.PERIODOS_ROTACAO[planeta] || 1;
+
+                    this.planetas.push({
+                        node,       // BezierCircle – controla órbita (posição)
+                        sphereNode, // Sphere – controla rotação axial
+                        nome: planeta,
+                        raioOrbital: 0,
+                        anguloAtual: 0,
+                        alturaY: 0,
+                        omegaOrbital: OMEGA_TERRA / periodo,
+                        omegaRotacao: (OMEGA_ROT / Math.abs(periodoRot)) * Math.sign(periodoRot)
+                    });
+                }
+
+                // Lua: BezierCircle_003 é filho de Sphere_003 (Terra) → posição em espaço local
+                const luaOrbita = idxNos['beziercircle_003'];
+                const luaSphere = idxNos['sphere_010'];
+                if (luaOrbita) {
+                    this.dadosLua = {
+                        node: luaOrbita,
+                        sphereNode: luaSphere,
+                        raioOrbital: 0,
+                        anguloAtual: 0,
+                        omegaOrbital: OMEGA_TERRA / 0.0748,
+                        omegaRotacao: OMEGA_ROT / Math.abs(this.PERIODOS_ROTACAO.MOON)
+                    };
+                }
+
+                console.log('[Órbita] Planetas mapeados:', this.planetas.map(p => p.nome).join(', '));
+                this.pronto = true;
+            },
+
+            // Lê as posições atuais dos bones (deve ser chamado ANTES de
+            // remover o animation-mixer, enquanto a animação ainda está ativa)
+            _lerPosicoes: function () {
+                for (const p of this.planetas) {
+                    const rx = p.node.position.x;
+                    const rz = p.node.position.z;
+                    const r = Math.sqrt(rx * rx + rz * rz);
+                    if (r > 0.0001) {
+                        p.raioOrbital = r;
+                        p.anguloAtual = Math.atan2(rz, rx);
+                    }
+                    p.alturaY = p.node.position.y;
+                }
+
+                if (this.dadosLua) {
+                    const l = this.dadosLua;
+                    // BezierCircle_003 está em espaço local da Terra – posição já é relativa
+                    const r = Math.sqrt(l.node.position.x ** 2 + l.node.position.z ** 2);
+                    if (r > 0.0001) {
+                        l.raioOrbital = r;
+                        l.anguloAtual = Math.atan2(l.node.position.z, l.node.position.x);
+                    }
+                }
+            },
+
+            ativar: function () { this.ativo = true; },
+            desativar: function () { this.ativo = false; },
+
+            tick: function (tempo, delta) {
+                if (!this.ativo || !this.pronto) return;
+
+                const dt = (delta / 1000) * this.data.velocidade;
+
+                for (const p of this.planetas) {
+                    if (p.raioOrbital < 0.0001) continue;
+
+                    p.anguloAtual += p.omegaOrbital * dt;
+                    p.node.position.x = Math.cos(p.anguloAtual) * p.raioOrbital;
+                    p.node.position.z = Math.sin(p.anguloAtual) * p.raioOrbital;
+                    p.node.position.y = p.alturaY;
+                    if (p.sphereNode) p.sphereNode.rotation.y += p.omegaRotacao * dt;
+                }
+
+                if (this.dadosLua && this.dadosLua.raioOrbital > 0.0001) {
+                    const l = this.dadosLua;
+                    l.anguloAtual += l.omegaOrbital * dt;
+                    // posição em espaço local da Terra – a hierarquia pai/filho cuida do resto
+                    l.node.position.x = Math.cos(l.anguloAtual) * l.raioOrbital;
+                    l.node.position.z = Math.sin(l.anguloAtual) * l.raioOrbital;
+                    if (l.sphereNode) l.sphereNode.rotation.y += l.omegaRotacao * dt;
+                }
+            }
+        });
+
+        /* ══════════════════════════════════════════════════════
+           COMPONENTE: interacao-sistema-solar
+           Gerencia painel informativo e todos os controles.
+        ════════════════════════════════════════════════════════ */
+        AFRAME.registerComponent('interacao-sistema-solar', {
+            init: function () {
+                this.painel = document.getElementById('painel-hud');
+                this.hudTitulo = document.getElementById('hud-titulo');
+                this.hudDesc = document.getElementById('hud-desc');
+                this.controles = document.getElementById('controles');
+                this.dicaToque = document.getElementById('dica-toque');
+                this.btnOrbita = document.getElementById('btn-orbita');
+                this.btnPausa = document.getElementById('btn-pausa');
+                this.velGrupo = document.getElementById('vel-grupo');
+                this.labelVel = document.getElementById('label-vel');
+
+                this.modoOrbital = false;
+                this.pausado = false;
+                this.PASSOS_VEL = [0.25, 0.5, 1, 2, 5, 10];
+                this.idxVel = 2; // começa em 1×
+
+                const marcador = this.el.parentEl;
+
+                // ── Marcador encontrado / perdido ──────────────────────
+                marcador.addEventListener('markerFound', () => {
+                    this.controles.style.display = 'flex';
+                    this.dicaToque.style.display = 'block';
+                });
+
+                marcador.addEventListener('markerLost', () => {
+                    this.painel.style.display = 'none';
+                    this.dicaToque.style.display = 'none';
+                });
+
+                // ── Interação 1: toque em astro → painel informativo ───
+                this.el.addEventListener('click', ev => {
+                    if (!ev.detail.intersection) return;
+                    const nome = ev.detail.intersection.object.name.toUpperCase();
+                    this._exibirInfo(nome);
+                });
+
+                document.getElementById('btn-fechar-hud')
+                    .addEventListener('click', () => {
+                        this.painel.style.display = 'none';
+                    });
+
+                // ── Interação 2: ativar / desativar órbitas ────────────
+                this.btnOrbita.addEventListener('click', () => {
+                    this.modoOrbital = !this.modoOrbital;
+                    this.pausado = false;
+                    this.btnPausa.textContent = '⏸ Pausar';
+
+                    const compOrbita = this.el.components['orbita-planetaria'];
+
+                    if (this.modoOrbital) {
+                        // 1. Lê posições atuais dos bones ANTES de parar o mixer
+                        if (compOrbita) compOrbita._lerPosicoes();
+                        // 2. Remove o animation-mixer para liberar controle dos bones
+                        this.el.removeAttribute('animation-mixer');
+                        // 3. Inicia o tick orbital
+                        if (compOrbita) compOrbita.ativar();
+                        this.btnOrbita.textContent = '🪐 Parar Órbitas';
+                        this.velGrupo.style.display = 'flex';
+                    } else {
+                        if (compOrbita) compOrbita.desativar();
+                        // Restaura o animation-mixer original
+                        this.el.setAttribute('animation-mixer',
+                            'clip: *; loop: repeat; timeScale: 1');
+                        this.btnOrbita.textContent = '🔄 Iniciar Órbitas';
+                        this.velGrupo.style.display = 'none';
+                    }
+                });
+
+                // ── Pausar / retomar ───────────────────────────────────
+                this.btnPausa.addEventListener('click', () => {
+                    this.pausado = !this.pausado;
+                    const compOrbita = this.el.components['orbita-planetaria'];
+
+                    if (this.modoOrbital) {
+                        if (compOrbita) compOrbita.ativo = !this.pausado;
+                    } else {
+                        this.el.setAttribute('animation-mixer',
+                            `clip: *; loop: repeat; timeScale: ${this.pausado ? 0 : 1}`);
+                    }
+                    this.btnPausa.textContent = this.pausado ? '▶ Retomar' : '⏸ Pausar';
+                });
+
+                // ── Controle de velocidade orbital ─────────────────────
+                document.getElementById('btn-vel-menos').addEventListener('click', () => {
+                    if (this.idxVel > 0) {
+                        this.idxVel--;
+                        this._aplicarVelocidade();
+                    }
+                });
+
+                document.getElementById('btn-vel-mais').addEventListener('click', () => {
+                    if (this.idxVel < this.PASSOS_VEL.length - 1) {
+                        this.idxVel++;
+                        this._aplicarVelocidade();
+                    }
+                });
+            },
+
+            _aplicarVelocidade: function () {
+                const vel = this.PASSOS_VEL[this.idxVel];
+                this.el.setAttribute('orbita-planetaria', 'velocidade', vel);
+                this.labelVel.textContent = vel + '×';
+            },
+
+            _exibirInfo: function (nome) {
+                // Chaves baseadas nos nomes de mesh do novo modelo (solar_system.glb)
+                const catalogo = {
+                    'SUN': { e: '☀️', t: 'Sol', d: 'A estrela central do sistema. Composta principalmente de hidrogênio e hélio, representa 99,8% de toda a massa do Sistema Solar.' },
+                    'OBJECT_50': { e: '☀️', t: 'Sol', d: 'A estrela central do sistema. Composta principalmente de hidrogênio e hélio, representa 99,8% de toda a massa do Sistema Solar.' },
+                    'OBJECT_51': { e: '☀️', t: 'Sol', d: 'A estrela central do sistema. Composta principalmente de hidrogênio e hélio, representa 99,8% de toda a massa do Sistema Solar.' },
+                    'SPHERE_002': { e: '🪨', t: 'Mercúrio', d: 'Menor planeta e o mais próximo do Sol. Sem atmosfera significativa, as temperaturas variam de −180 °C a +430 °C.' },
+                    'SPHERE_009': { e: '🟡', t: 'Vênus', d: 'O planeta mais quente do sistema. Sua densa atmosfera de CO₂ provoca um efeito estufa extremo, mantendo ~465 °C na superfície.' },
+                    'SPHERE_003': { e: '🌍', t: 'Terra', d: 'Nosso lar! O único planeta com água líquida e vida confirmadas. Seu campo magnético nos protege do vento solar.' },
+                    'SPHERE_010': { e: '🌙', t: 'Lua', d: 'Satélite natural da Terra. Controla nossas marés e foi o único corpo além da Terra visitado por humanos (1969).' },
+                    'SPHERE_MATERIAL_003': { e: '🔴', t: 'Marte', d: 'O Planeta Vermelho. Abriga o Monte Olimpo, o maior vulcão do Sistema Solar, com 22 km de altitude.' },
+                    'SPHERE_005': { e: '🌀', t: 'Júpiter', d: 'O maior planeta do sistema. Sua Grande Mancha Vermelha é uma tempestade que persiste há mais de 350 anos.' },
+                    'SPHERE_006': { e: '💫', t: 'Saturno', d: 'Famoso pelo sistema de anéis de gelo e rocha. Possui 146 luas conhecidas, incluindo Titã, com atmosfera densa.' },
+                    'SPHERE_007': { e: '🧊', t: 'Urano', d: 'Gigante de gelo inclinado a 98°, girando praticamente "deitado". Possui 13 anéis e 28 luas conhecidas.' },
+                    'SPHERE_008': { e: '🌊', t: 'Netuno', d: 'O planeta mais distante do Sol. Seus ventos chegam a 2.100 km/h, os mais rápidos de todo o Sistema Solar.' },
+                };
+
+                let info = null;
+                for (const chave of Object.keys(catalogo)) {
+                    if (nome.includes(chave)) { info = catalogo[chave]; break; }
+                }
+
+                if (!info) {
+                    info = { e: '🌌', t: 'Sistema Solar', d: 'Toque diretamente em um astro para saber mais sobre ele!' };
+                }
+
+                this.hudTitulo.textContent = `${info.e} ${info.t}`;
+                this.hudDesc.textContent = info.d;
+                this.painel.style.display = 'block';
+            }
+        });
+    </script>
+</head>
+
+<body>
+
+    <!-- ── Tela de boas-vindas ────────────────────────────────── -->
+    <div id="tela-instrucoes">
+        <div class="icone">🪐</div>
+        <h1>Sistema Solar em RA</h1>
+        <p>Aponte a câmera para o marcador <strong>Hiro</strong> e explore o Sistema Solar em Realidade Aumentada.</p>
+        <p>Toque em qualquer astro para aprender sobre ele.</p>
+        <p>Ative as órbitas para ver os planetas em movimento!</p>
+        <button id="btn-comecar">Iniciar Experiência</button>
+    </div>
+
+    <!-- ── Tela de carregamento do modelo ───────────────────────── -->
+    <div id="tela-carregando">
+        <div class="spinner"></div>
+        <p>Carregando o Sistema Solar...</p>
+        <p style="font-size:0.78rem; color:#7a8fb0;">O modelo é grande (~61 MB). Aguarde alguns instantes.</p>
+        <p id="msg-erro-glb">Erro ao carregar o modelo 3D.<br>Verifique sua conexão e recarregue a página.</p>
+    </div>
+
+    <!-- ── Painel informativo ─────────────────────────────────── -->
+    <div id="painel-hud">
+        <button id="btn-fechar-hud" title="Fechar">✕</button>
+        <div id="hud-titulo"></div>
+        <div id="hud-desc"></div>
+    </div>
+
+    <!-- ── Controles AR (aparecem ao encontrar o marcador) ───── -->
+    <div id="controles">
+        <button id="btn-orbita" class="btn-ctrl">🔄 Iniciar Órbitas</button>
+        <button id="btn-pausa" class="btn-ctrl">⏸ Pausar</button>
+        <!-- Controle de velocidade (visível apenas no modo orbital) -->
+        <div id="vel-grupo">
+            <button id="btn-vel-menos" title="Diminuir velocidade">−</button>
+            <span id="label-vel">1×</span>
+            <button id="btn-vel-mais" title="Aumentar velocidade">+</button>
+        </div>
+    </div>
+
+    <!-- ── Dica de interação ──────────────────────────────────── -->
+    <div id="dica-toque">👆 Toque em um astro</div>
+
+    <!-- ── Cena AR ────────────────────────────────────────────── -->
+    <a-scene embedded arjs="sourceType: webcam; trackingMethod: best; debugUIEnabled: false;"
+        vr-mode-ui="enabled: false" renderer="logarithmicDepthBuffer: false;">
+
+        <a-assets>
+            <a-asset-item id="modelo-glb" src="solar_system.glb"></a-asset-item>
+        </a-assets>
+
+        <a-entity camera>
+            <a-entity cursor="fuse: false" raycaster="objects: .clicavel" position="0 0 -1" visible="false">
+            </a-entity>
+        </a-entity>
+
+        <a-marker preset="hiro">
+            <!--
+                scale: ajuste conforme o tamanho do modelo no marcador.
+                
+            -->
+            <a-entity id="modelo-sistema" gltf-model="#modelo-glb" position="0 0 0" scale="0.05 0.05 0.05"
+                class="clicavel" animation-mixer="clip: *; loop: repeat; timeScale: 0.5" orbita-planetaria
+                interacao-sistema-solar>
+            </a-entity>
+        </a-marker>
+
+    </a-scene>
+
+    <script>
+        var modeloCarregado = false;
+
+        document.getElementById('modelo-sistema').addEventListener('model-loaded', function () {
+            modeloCarregado = true;
+            document.getElementById('tela-carregando').style.display = 'none';
+        });
+
+        document.getElementById('modelo-glb').addEventListener('error', function () {
+            document.querySelector('#tela-carregando .spinner').style.display = 'none';
+            document.querySelector('#tela-carregando p').style.display = 'none';
+            document.getElementById('msg-erro-glb').style.display = 'block';
+        });
+
+        document.getElementById('btn-comecar').addEventListener('click', function () {
+            document.getElementById('tela-instrucoes').style.display = 'none';
+            if (!modeloCarregado) {
+                document.getElementById('tela-carregando').style.display = 'flex';
+            }
+        });
+    </script>
+
+</body>
+
+</html>

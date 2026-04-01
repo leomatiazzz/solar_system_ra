@@ -1,0 +1,43 @@
+=====================================================
+  SISTEMA SOLAR EM REALIDADE AUMENTADA – WebAR
+  Projeto Final – Desenvolvimento para RA
+=====================================================
+
+SOBRE O PROJETO
+---------------
+Aplicação de Realidade Aumentada (WebAR) educativa desenvolvida
+com A-Frame e AR.js. Exibe o Sistema Solar sobre o marcador Hiro
+e permite explorar informações sobre cada astro por toque/clique.
+
+Setor de aplicação: EDUCAÇÃO
+
+
+COMO USAR
+---------
+1. Imprima ou exiba o marcador Hiro em uma tela secundária.
+2. Abra o link da aplicação em um dispositivo com câmera.
+3. Conceda permissão de acesso à câmera quando solicitado.
+4. Aponte a câmera para o marcador Hiro.
+5. Toque em qualquer planeta para exibir informações sobre ele.
+6. Use o botão "⏸ Pausar / ▶ Retomar" para controlar a animação.
+
+Marcador Hiro:
+https://raw.githack.com/AR-js-org/AR.js/master/data/images/HIRO.jpg
+
+
+CRÉDITOS DO MODELO 3D
+----------------------
+Modelo  : High Resolution Solar System
+Autor   : Pedro B. Goulart (Pebegou)
+Página  : https://sketchfab.com/3d-models/high-resolution-solar-system-59fcc3e1dc634ef192215a7e485f147e
+Licença : Creative Commons Attribution 4.0 (CC BY 4.0)
+          https://creativecommons.org/licenses/by/4.0/
+
+
+TECNOLOGIAS UTILIZADAS
+-----------------------
+- A-Frame 1.3.0    – https://aframe.io
+- AR.js             – https://ar-js-org.github.io/AR.js-Docs/
+- aframe-extras     – https://github.com/donmccurdy/aframe-extras
+
+=====================================================
